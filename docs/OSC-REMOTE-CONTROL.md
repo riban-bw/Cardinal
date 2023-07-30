@@ -55,3 +55,23 @@ Sending a `/load` message will load the patch file contained in the message.
 Patch contents must be in compressed format, not plain-text json.
 
 Cardinal reply back indicating either success or failure, using `/resp` path and "load" message.
+
+### /load_file s:file-path
+
+Sending a `/load_path` message will load the patch file pointed to by the message.
+The full path and filename must be passed for a valid patch file.
+
+### /add_cable h:srcModuleId i:srcOutputId h:dstModuleId i:dstInputId s:color
+
+Sending a `/add_cable` message will add a new cable and connect it to the specified source module's output and the specified destination module's input.
+The optional color parameter may be supplied in the format "#rrggbb". If no color is provided then the next color is used.
+
+### /remove_cable h:cableId
+NOT YET IMPLEMENTED
+
+Sending a `/remove_cable` message will remove the specified cable.
+
+### /remove_cable h::srcModuleId i:srcOutputId h:dstModuleId i:dstInputId
+
+Sending a `remove_cable` message with these extra parameters will remove the cable connected between the pecified source module's output and the specified destination module's input.
+
