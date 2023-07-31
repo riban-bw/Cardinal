@@ -58,14 +58,14 @@ Cardinal replies back indicating either success or failure, using `param` path a
 
 #### /load b:patch-blob
 
-Sending a `/load` message will load the patch file contained in the message.  
+Sending a `/load` message with blob parameter will load the patch file contained in the message.  
 Patch contents must be in compressed format, not plain-text json.
 
 Cardinal replies back indicating either success or failure, using `/resp` path and "load" message.
 
-### /load_file s:file-path
+### /load s:file-path
 
-Sending a `/load_path` message will load the patch file pointed to by the message.
+Sending a `/load` message with string parameter will load the patch file pointed to by the message.
 The full path and filename must be passed for a valid patch file.
 
 Cardinal replies back indicating either success or failure, using `/resp` path and "load" message.

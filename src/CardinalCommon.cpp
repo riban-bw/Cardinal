@@ -48,6 +48,10 @@
 # error wrong build
 #endif
 
+#if (defined(STATIC_BUILD) && !defined(__MOD_DEVICES__)) || CARDINAL_VARIANT_MINI
+# undef CARDINAL_INIT_OSC_THREAD
+#endif
+
 #ifdef NDEBUG
 # undef DEBUG
 #endif
@@ -269,6 +273,8 @@ static int osc_load_handler(const char*, const char* types, lo_arg** argv, int a
 {
     d_debug("osc_load_handler()");
     DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
+    if (types[0] == 's')
+        return osc_load_file_handler(NULL, types, argv, argc, m, self);
     DISTRHO_SAFE_ASSERT_RETURN(types != nullptr && types[0] == 'b', 0);
 
     const int32_t size = argv[0]->blob.size;
@@ -334,7 +340,7 @@ static int osc_param_handler(const char*, const char* types, lo_arg** argv, int 
 static int osc_add_cable_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
 {
     d_debug("osc_add_cable_handler()");
-    DISTRHO_SAFE_ASSERT_RETURN(argc == 4, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(argc > 3, 0);
     DISTRHO_SAFE_ASSERT_RETURN(types != nullptr, 0);
     DISTRHO_SAFE_ASSERT_RETURN(types[0] == 'h', 0);
     DISTRHO_SAFE_ASSERT_RETURN(types[1] == 'i', 0);
@@ -354,12 +360,23 @@ static int osc_add_cable_handler(const char*, const char* types, lo_arg** argv, 
         DISTRHO_SAFE_ASSERT_RETURN(srcModule != nullptr, 0);
         rack::engine::Module* const dstModule = context->engine->getModule(dstModuleId);
         DISTRHO_SAFE_ASSERT_RETURN(dstModule != nullptr, 0);
+        // Create cable
 	auto cable = new rack::engine::Cable;
         cable->inputModule = dstModule;
         cable->inputId = dstPortId;
         cable->outputModule = srcModule;
         cable->outputId = srcPortId;
         context->engine->addCable(cable);
+        // Create CableWidget
+        auto cw = new rack::app::CableWidget;
+        cw->setCable(cable);
+        if (argc > 4 && types[4] == 's') {
+            std::string s((char*)(argv[4]));
+            cw->color = rack::color::fromHexString(s);
+        }
+        else
+            cw->color = context->scene->rack->getNextCableColor();
+        context->scene->rack->addCable(cw);
     }
 
     return 0;
@@ -747,9 +764,10 @@ bool Initializer::startRemoteServer(const char* const port)
     lo_server_thread_add_method(oscServerThread, "/hello", "", osc_hello_handler, this);
     lo_server_thread_add_method(oscServerThread, "/host-param", "if", osc_host_param_handler, this);
     lo_server_thread_add_method(oscServerThread, "/load", "b", osc_load_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/load_file", "s", osc_load_file_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/load", "s", osc_load_file_handler, this);
     lo_server_thread_add_method(oscServerThread, "/param", "hif", osc_param_handler, this);
     lo_server_thread_add_method(oscServerThread, "/add_cable", "hihi", osc_add_cable_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/add_cable", "hihis", osc_add_cable_handler, this);
     lo_server_thread_add_method(oscServerThread, "/remove_cable", "h", osc_remove_cable_handler, this);
     lo_server_thread_add_method(oscServerThread, "/screenshot", "b", osc_screenshot_handler, this);
     lo_server_thread_add_method(oscServerThread, nullptr, nullptr, osc_fallback_handler, nullptr);
