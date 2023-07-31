@@ -67,11 +67,25 @@ Sending a `/add_cable` message will add a new cable and connect it to the specif
 The optional color parameter may be supplied in the format "#rrggbb". If no color is provided then the next color is used.
 
 ### /remove_cable h:cableId
-NOT YET IMPLEMENTED
 
 Sending a `/remove_cable` message will remove the specified cable.
 
 ### /remove_cable h::srcModuleId i:srcOutputId h:dstModuleId i:dstInputId
+*NOT YET IMPLEMENTED*
 
 Sending a `remove_cable` message with these extra parameters will remove the cable connected between the pecified source module's output and the specified destination module's input.
 
+### /add_module s:plugin s:model i:position i:rack
+*NOT YET IMPLEMENTED*
+
+Sending a `add_module` message will add a new module to the rack at the sepcified position. If `position` and `rack` are omitted then the module is added after the last module.
+
+### /add_module h:module_id
+*NOT YET IMPLEMENTED*
+
+Sending a `remove_module` message will remove the specified module.
+
+### /remove_module i:position i:rack
+*NOT YET IMPLEMENTED*
+
+Sending a `remove_module` message with these extra parameters will remove the module at the specified position.
