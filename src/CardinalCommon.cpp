@@ -361,13 +361,13 @@ static int osc_add_cable_handler(const char*, const char* types, lo_arg** argv, 
         rack::engine::Module* const dstModule = context->engine->getModule(dstModuleId);
         DISTRHO_SAFE_ASSERT_RETURN(dstModule != nullptr, 0);
         // Create cable
-	auto cable = new rack::engine::Cable;
+        auto cable = new rack::engine::Cable;
         cable->inputModule = dstModule;
         cable->inputId = dstPortId;
         cable->outputModule = srcModule;
         cable->outputId = srcPortId;
         context->engine->addCable(cable);
-        // Create CableWidget
+        // Create cable widget
         auto cw = new rack::app::CableWidget;
         cw->setCable(cable);
         if (argc > 4 && types[4] == 's') {
@@ -394,6 +394,13 @@ static int osc_remove_cable_handler(const char*, const char* types, lo_arg** arg
         const int64_t cableId = argv[0]->h;
         CardinalPluginContext* const context = plugin->context;
         rack::contextSet(context);
+        // Remove cable widget
+        auto cw = context->scene->rack->getCable(cableId);
+        if (cw) {
+            context->scene->rack->removeCable(cw);
+            delete cw;
+        }
+        // remove cable
         auto cable = context->engine->getCable(cableId);
         if (cable) {
             context->engine->removeCable(cable);
