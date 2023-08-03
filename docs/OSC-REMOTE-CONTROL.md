@@ -8,6 +8,7 @@ Starting with version 23.08, Cardinal allows remote control of the entire patch/
 Make sure you are using version 23.08 or later of Cardinal, start up the standalone (both Native and JACK variants will work) and under "Engine" menu click on "Enable OSC remote control".
 
 NOTE: This option is not available when using Cardinal as a plugin, only for standalones.
+NOTE: OSC is enabled by default in headless build.
 
 ![screenshot](Docs_Remote-Control-1.png "Screenshot")
 
@@ -75,7 +76,7 @@ Cardinal replies back indicating either success or failure, using `/resp` path a
 Sending a `/add_cable` message will add a new cable and connect it to the specified source module's output and the specified destination module's input.
 The optional `color` parameter may be supplied in the format "#rrggbb". If no color is provided then the next color is used.
 
-Cardinal replies back indicating either success or failure, using `/resp` path and "load" message.
+Cardinal replies back if the cable is added with the cable's ID, using `/cable` path and `u:cableId` message.
 
 ### /remove_cable h:cableId
 
@@ -98,19 +99,25 @@ If `index` is omitted then a response will be sent for each cable attached to th
 
 if a cable exists then Cardinal replies back using `/cable` path and `h:cable_id h:module_id i:port_id s:color` message.
 
+
+### /add_module h:module_id
+
+Sending a `/add_module` message will add a new module to the rack.
+
+Cardinal replies back if the module is added with the module's ID, using `/module` path and `u:moduleId i:position i:rack` message.
+
 ### /add_module s:plugin s:model i:position i:rack
 *NOT YET IMPLEMENTED*
 
-Sending a `/add_module` message will add a new module to the rack at the sepcified position. If `position` and `rack` are omitted then the module is added after the last module.
+Sending a `/add_module` message with these extra parameters will add a new module to the rack at the sepcified position.
 
-Cardinal replies back indicating either success or failure, using `/module` path and `u:moduleId i:position i:rack`  message.
+Cardinal replies back if the module is added with the module's ID, using `/module` path and `u:moduleId` message.
 
-### /add_module h:module_id
-*NOT YET IMPLEMENTED*
+### /remove_module h:module_id
 
 Sending a `/remove_module` message will remove the specified module.
 
-Cardinal replies back indicating either success or failure, using `/module` path and `u:moduleId i:position i:rack`  message.
+Tnhere is no reply back from Cardinal.
 
 ### /remove_module i:position i:rack
 *NOT YET IMPLEMENTED*
