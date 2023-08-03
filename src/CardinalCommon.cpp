@@ -261,13 +261,21 @@ static int osc_load_file_handler(const char*, const char* types, lo_arg** argv, 
     DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
     DISTRHO_SAFE_ASSERT_RETURN(types != nullptr && types[0] == 's', 0);
 
+    bool ok = false;
     if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
     {
         CardinalPluginContext* const context = plugin->context;
         rack::contextSet(context);
         std::string s((char*)(argv[0]));
         context->patch->load(s);
+        ok = true;
     }
+
+    const lo_address source = lo_message_get_source(m);
+    const lo_server server = static_cast<Initializer*>(self)->oscServer;
+    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "load", ok ? "ok" : "fail");
+    return 0;
+
     return 0;
 }
 
@@ -379,8 +387,8 @@ static int osc_add_module_handler(const char*, const char* types, lo_arg** argv,
     const std::string pluginSlug((char*)(argv[0]));
     const std::string modelSlug((char*)(argv[1]));
     if (argc == 4) {
-        DISTRHO_SAFE_ASSERT_RETURN(types[2] == 'i', 0);
-        DISTRHO_SAFE_ASSERT_RETURN(types[3] == 'i', 0);
+        DISTRHO_SAFE_ASSERT_RETURN(types[2] == 'f', 0);
+        DISTRHO_SAFE_ASSERT_RETURN(types[3] == 'f', 0);
     }
 
     if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
@@ -397,17 +405,17 @@ static int osc_add_module_handler(const char*, const char* types, lo_arg** argv,
         rack::app::ModuleWidget* const moduleWidget = helper->createModuleWidget(module);
         DISTRHO_SAFE_ASSERT_RETURN(moduleWidget != nullptr, 0);
         context->engine->addModule(module);
-        if (argc > 2) {
+        if (argc == 4) {
             if (rack::settings::squeezeModules)
-                context->scene->rack->setModulePosSqueeze(moduleWidget, argv[2]->i);
+                context->scene->rack->setModulePosSqueeze(moduleWidget, rack::math::Vec(argv[2]->f, argv[3]->f));
             else
-                context->scene->rack->setModulePosNearest(moduleWidget, argv[2]->i);
+                context->scene->rack->setModulePosNearest(moduleWidget, rack::math::Vec(argv[2]->f, argv[3]->f));
         }
         context->scene->rack->addModule(moduleWidget);
         // Send module id back to requester
-        const lo_address target = lo_message_get_source(m);
+        const lo_address source = lo_message_get_source(m);
         const lo_server server = static_cast<Initializer*>(self)->oscServer;
-        lo_send_from(target, server, LO_TT_IMMEDIATE, "/module", "h", module->id);
+        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/module", "h", module->id);
     }
     return 0;
 }
@@ -455,7 +463,7 @@ static int osc_add_cable_handler(const char*, const char* types, lo_arg** argv, 
         // Send cable id back to requester
         const lo_address target = lo_message_get_source(m);
         const lo_server server = static_cast<Initializer*>(self)->oscServer;
-        lo_send_from(target, server, LO_TT_IMMEDIATE, "/module", "h", cable->id);
+        lo_send_from(target, server, LO_TT_IMMEDIATE, "/resp/module", "h", cable->id);
     }
 
     return 0;
@@ -487,6 +495,26 @@ static int osc_remove_cable_handler(const char*, const char* types, lo_arg** arg
         }
     }
 
+    return 0;
+}
+
+static int osc_clear_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_clear_handler()");
+    bool ok = false;
+
+    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+    {
+        CardinalPluginContext* const context = plugin->context;
+        rack::contextSet(context);
+        context->scene->rack->clear();
+        context->engine->clear();
+        ok = true;
+    }
+
+    const lo_address source = lo_message_get_source(m);
+    const lo_server server = static_cast<Initializer*>(self)->oscServer;
+    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "clear", ok ? "ok" : "fail");
     return 0;
 }
 
@@ -852,12 +880,13 @@ bool Initializer::startRemoteServer(const char* const port)
     lo_server_thread_add_method(oscServerThread, "/load", "b", osc_load_handler, this);
     lo_server_thread_add_method(oscServerThread, "/load", "s", osc_load_file_handler, this);
     lo_server_thread_add_method(oscServerThread, "/param", "hif", osc_param_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/add_cable", "hihi", osc_add_cable_handler, this);
     lo_server_thread_add_method(oscServerThread, "/add_module", "ss", osc_add_module_handler, this);
     lo_server_thread_add_method(oscServerThread, "/add_module", "ssii", osc_add_module_handler, this);
     lo_server_thread_add_method(oscServerThread, "/remove_module", "h", osc_remove_module_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/add_cable", "hihi", osc_add_cable_handler, this);
     lo_server_thread_add_method(oscServerThread, "/add_cable", "hihis", osc_add_cable_handler, this);
     lo_server_thread_add_method(oscServerThread, "/remove_cable", "h", osc_remove_cable_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/clear", "", osc_clear_handler, this);
     lo_server_thread_add_method(oscServerThread, "/screenshot", "b", osc_screenshot_handler, this);
     lo_server_thread_add_method(oscServerThread, nullptr, nullptr, osc_fallback_handler, nullptr);
     lo_server_thread_start(oscServerThread);
@@ -871,13 +900,15 @@ bool Initializer::startRemoteServer(const char* const port)
     lo_server_add_method(oscServer, "/hello", "", osc_hello_handler, this);
     lo_server_add_method(oscServer, "/host-param", "if", osc_host_param_handler, this);
     lo_server_add_method(oscServer, "/load", "b", osc_load_handler, this);
-    lo_server_add_method(oscServer, "/load_file", "s", osc_load_file_handler, this);
+    lo_server_add_method(oscServer, "/load", "s", osc_load_file_handler, this);
     lo_server_add_method(oscServer, "/param", "hif", osc_param_handler, this);
     lo_server_add_method(oscServer, "/add_module", "ss", osc_add_module_handler, this);
     lo_server_add_method(oscServer, "/add_module", "ssii", osc_add_module_handler, this);
     lo_server_add_method(oscServer, "/remove_module", "h", osc_remove_module_handler, this);
     lo_server_add_method(oscServer, "/add_cable", "hihi", osc_add_cable_handler, this);
+    lo_server_add_method(oscServer, "/add_cable", "hihis", osc_add_cable_handler, this);
     lo_server_add_method(oscServer, "/remove_cable", "h", osc_remove_cable_handler, this);
+    lo_server_add_method(oscServer, "/clear", "", osc_clear_handler, this);
     lo_server_add_method(oscServer, nullptr, nullptr, osc_fallback_handler, nullptr);
    #endif
 

@@ -5,10 +5,9 @@ Starting with version 23.08, Cardinal allows remote control of the entire patch/
 
 ## Activating remote control
 
-Make sure you are using version 23.08 or later of Cardinal, start up the standalone (both Native and JACK variants will work) and under "Engine" menu click on "Enable OSC remote control".
+Make sure you are using version 23.08 or later of Cardinal, start up the standalone (both Native and JACK variants will work) and under "Engine" menu click on "Enable OSC remote control". OSC is enabled by default in headless build.
 
 NOTE: This option is not available when using Cardinal as a plugin, only for standalones.
-NOTE: OSC is enabled by default in headless build.
 
 ![screenshot](Docs_Remote-Control-1.png "Screenshot")
 
@@ -50,85 +49,83 @@ There is no reply back from Cardinal.
 
 NOTE: the first argument must of be int64 type, as regular 32-bit integer is not enough to fit the whole range of values used inside Cardinal/Rack.
 
-### /get_param h:moduleId i:paramId
+#### /get_param h:moduleId i:paramId
 *NOT YET IMPLEMENTED*
 
 Sending a `/get_param` message will request the value of the parameter.
 
-Cardinal replies back indicating either success or failure, using `param` path and `h:moduleId i:paramId f:value` message.
+Cardinal replies back indicating either success or failure, using `/resp/param` path and `h:moduleId i:paramId f:value` message.
 
 #### /load b:patch-blob
 
 Sending a `/load` message with blob parameter will load the patch file contained in the message.  
 Patch contents must be in compressed format, not plain-text json.
 
-Cardinal replies back indicating either success or failure, using `/resp` path and "load" message.
+Cardinal replies back indicating either success or failure, using `/resp` path with `s:"load" s:"ok"|"fail"`` message.
 
-### /load s:file-path
+#### /load s:file-path
 
 Sending a `/load` message with string parameter will load the patch file pointed to by the message.
 The full path and filename must be passed for a valid patch file.
 
-Cardinal replies back indicating either success or failure, using `/resp` path and "load" message.
+Cardinal replies back indicating either success or failure, using `/resp` path with `s:"load" s:"ok"|"fail"`` message.
 
-### /add_cable h:srcModuleId i:srcOutputId h:dstModuleId i:dstInputId s:color
+#### /add_cable h:srcModuleId i:srcOutputId h:dstModuleId i:dstInputId s:color
 
 Sending a `/add_cable` message will add a new cable and connect it to the specified source module's output and the specified destination module's input.
 The optional `color` parameter may be supplied in the format "#rrggbb". If no color is provided then the next color is used.
 
-Cardinal replies back if the cable is added with the cable's ID, using `/cable` path and `u:cableId` message.
+Cardinal replies back if the cable is added with the cable's ID, using `/resp/cable` path and `u:cableId` message.
 
-### /remove_cable h:cableId
+#### /remove_cable h:cableId
 
 Sending a `/remove_cable` message will remove the specified cable.
 
 There is no reply back from Cardinal.
 
-### /remove_cable h:srcModuleId i:srcOutputId h:dstModuleId i:dstInputId
+#### /remove_cable h:srcModuleId i:srcOutputId h:dstModuleId i:dstInputId
 *NOT YET IMPLEMENTED*
 
 Sending a `/remove_cable` message with these extra parameters will remove the cable connected between the specified source module's output and the specified destination module's input.
 
 There is no reply back from Cardinal.
 
-### /get_cable h:moduleId i:portId i:index
+#### /get_cable h:moduleId i:portId i:index
 *NOT YET IMPLEMENTED*
 
 Sending a `/get_cable` message will request info about the specified cable attached to the port (input / output). The `index` parameter specifies which cable to request (0..quantity of cables).
 If `index` is omitted then a response will be sent for each cable attached to the port. I `portId` is omitted then a response will be sent for all cables attached to the module. If `moduleId` is omitted then a response will be sent for all cables in the current patch.
 
-if a cable exists then Cardinal replies back using `/cable` path and `h:cable_id h:module_id i:port_id s:color` message.
+if a cable exists then Cardinal replies back using `/resp/cable` path and `h:cable_id h:module_id i:port_id s:color` message.
 
 
-### /add_module h:module_id
+#### /add_module h:module_id
 
 Sending a `/add_module` message will add a new module to the rack.
 
-Cardinal replies back if the module is added with the module's ID, using `/module` path and `u:moduleId i:position i:rack` message.
+Cardinal replies back if the module is added with the module's ID, using `/resp/module` path and `u:moduleId` message.
 
-### /add_module s:plugin s:model i:position i:rack
-*NOT YET IMPLEMENTED*
+#### /add_module s:plugin s:model f:posX f:posY
 
 Sending a `/add_module` message with these extra parameters will add a new module to the rack at the sepcified position.
 
-Cardinal replies back if the module is added with the module's ID, using `/module` path and `u:moduleId` message.
+Cardinal replies back if the module is added with the module's ID, using `/resp/module` path and `u:moduleId` message.
 
-### /remove_module h:module_id
+#### /remove_module h:module_id
 
 Sending a `/remove_module` message will remove the specified module.
 
-Tnhere is no reply back from Cardinal.
-
-### /remove_module i:position i:rack
-*NOT YET IMPLEMENTED*
-
-Sending a `/remove_module` message with these extra parameters will remove the module at the specified position.
-
 There is no reply back from Cardinal.
 
-### /get_modules i:position i:rack
+#### /get_modules i:position i:rack
 *NOT YET IMPLEMENTED*
 
-Sendind a `/get_modules` message will request info of the module at the specified position. If position and rack are omitted then a response will be sent for each installed module.
+Sending a `/get_modules` message will request info of the module at the specified position. If position and rack are omitted then a response will be sent for each installed module.
 
-Cardinal replies back using '/module' path and `u:moduleId i:position i:rack` message.
+Cardinal replies back using `/resp/module` path and `u:moduleId i:position i:rack` message.
+
+#### /clear
+
+Sending a `/clear` message will remove all cables and modules.
+
+Cardinal replies back indicating either success or failure, using `/resp` path with `s:"clear" s:"ok"|"fail"`` message.
