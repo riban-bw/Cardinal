@@ -57,31 +57,49 @@ Cardinal replies back indicating either success or failure, using `/resp` path w
 
 Sending a `/get_modules` message will request a list of all modules in the rack.
 
-Cardinal replise back using `/resp/module` path with `u:moduleId` message. (One message for each installed module.)
+Cardinal replies back using `/resp/module` path with `h:moduleId` message. (One message for each installed module.)
 
 #### /get_module_info h:module_id
 
 Sending a `/get_module_info` message will request a information about a module.
 
-Cardinal replise back using `/resp/module_info` path with `u:moduleId s:pluginSlug s:modelSlug i:numParams i:numInputs i:numOutputs i:numLights` message.
+Cardinal replies back using `/resp/module_info` path with `h:moduleId s:pluginSlug s:modelSlug i:numParams i:numInputs i:numOutputs i:numLights` message.
+
+#### /get_input_info h:module_id i:input
+
+Sending a `/get_input_info` message will request a information about a module input.
+
+Cardinal replies back using `/resp/input_info` path with `h:moduleId i:input s:name` message.
+
+#### /get_output_info h:module_id i:output
+
+Sending a `/get_output_info` message will request a information about a module output.
+
+Cardinal replies back using `/resp/output_info` path with `h:moduleId i:output s:name` message.
+
+#### /get_param_info h:module_id i:param
+
+Sending a `/get_param_info` message will request a information about a module param.
+
+Cardinal replies back using `/resp/param_info` path with `h:moduleId i:paramId s:name s:unit f:value f:minValue, f:maxValue f:defaultValue f:displayValue s:DisplayValueString i:displayPrecision s:description` message.
 
 #### /add_module s:plugin s:model
 
 Sending a `/add_module` message will add a new module to the rack.
 
-Cardinal replies back if the module is added with the module's ID, using `/resp/module` path with `u:moduleId` message.
+Cardinal replies back if the module is added with the module's ID, using `/resp/module` path with `h:moduleId` message.
 
 #### /add_module s:plugin s:model f:posX f:posY
 
 Sending a `/add_module` message with these extra parameters will add a new module to the rack at the sepcified position.
 
-Cardinal replies back if the module is added with the module's ID, using `/resp/module` path with `u:moduleId` message.
+Cardinal replies back if the module is added, using `/resp/module` path with `h:moduleId` message.
 
 #### /remove_module h:module_id
 
 Sending a `/remove_module` message will remove the specified module.
 
-Cardinal replies back indicating either success or failure, using `/resp` path with `s:"remove_module" s:"ok"|"fail"`` message.
+Cardinal replies back if the mdule is removed, using `/resp/remove_module` path with `h:moduleId` message.
 
 #### /get_cables
 
@@ -112,13 +130,13 @@ Cardinal replies back if the cable is added using `/resp/cable` path and `h:cabl
 
 Sending a `/remove_cable` message will remove the specified cable.
 
-Cardinal replies back using /resp path with `s:"remove_cable" s:"ok"|"fail"` message.
+Cardinal replies back using /resp/remove_cable path with `h:cable_id` message.
 
 #### /remove_cable h:srcModuleId i:output h:dstModuleId i:input
 
 Sending a `/remove_cable` message with these extra parameters will remove the cable connected between the specified source module's output and the specified destination module's input.
 
-Cardinal replies back using /resp path with `s:"remove_cable" s:"ok"|"fail"` message.
+Cardinal replies back using /resp/remove_cable path with `h:cable_id` message.
 
 #### /host-param i:port f:value
 
