@@ -255,27 +255,23 @@ static int osc_hello_handler(const char*, const char*, lo_arg**, int, const lo_m
     return 0;
 }
 
-static int osc_load_file_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+static int osc_clear_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
 {
-    d_debug("osc_load_file_handler()");
-    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
-    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr && types[0] == 's', 0);
-
+    d_debug("osc_clear_handler()");
     bool ok = false;
+
     if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
     {
         CardinalPluginContext* const context = plugin->context;
         rack::contextSet(context);
-        std::string s((char*)(argv[0]));
-        context->patch->load(s);
+        context->scene->rack->clear();
+        context->engine->clear();
         ok = true;
     }
 
     const lo_address source = lo_message_get_source(m);
     const lo_server server = static_cast<Initializer*>(self)->oscServer;
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "load", ok ? "ok" : "fail");
-    return 0;
-
+    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "clear", ok ? "ok" : "fail");
     return 0;
 }
 
@@ -319,61 +315,79 @@ static int osc_load_handler(const char*, const char* types, lo_arg** argv, int a
     return 0;
 }
 
-static int osc_param_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+static int osc_load_file_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
 {
-    d_debug("osc_param_handler()");
-    DISTRHO_SAFE_ASSERT_RETURN(argc == 3, 0);
-    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr, 0);
-    DISTRHO_SAFE_ASSERT_RETURN(types[0] == 'h', 0);
-    DISTRHO_SAFE_ASSERT_RETURN(types[1] == 'i', 0);
-    DISTRHO_SAFE_ASSERT_RETURN(types[2] == 'f', 0);
+    d_debug("osc_load_file_handler()");
+    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr && types[0] == 's', 0);
+
+    bool ok = false;
+    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+    {
+        CardinalPluginContext* const context = plugin->context;
+        rack::contextSet(context);
+        std::string s((char*)(argv[0]));
+        context->patch->load(s);
+        ok = true;
+    }
+
+    const lo_address source = lo_message_get_source(m);
+    const lo_server server = static_cast<Initializer*>(self)->oscServer;
+    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "load", ok ? "ok" : "fail");
+
+    return 0;
+}
+
+static int osc_get_modules_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_get_modules_handler()");
 
     if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
     {
         CardinalPluginContext* const context = plugin->context;
+        rack::contextSet(context);
 
-        const int64_t moduleId = argv[0]->h;
-        const int paramId = argv[1]->i;
-        const float paramValue = argv[2]->f;
-
-        rack::engine::Module* const module = context->engine->getModule(moduleId);
-        DISTRHO_SAFE_ASSERT_RETURN(module != nullptr, 0);
-
-        context->engine->setParamValue(module, paramId, paramValue);
+        const lo_address source = lo_message_get_source(m);
+        const lo_server server = static_cast<Initializer*>(self)->oscServer;
+        for (auto moduleId : context->engine->getModuleIds()) {
+            lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/module", "h", moduleId);
+        }
     }
 
     return 0;
 }
 
-
-static int osc_remove_module_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+static int osc_get_module_info_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
 {
-    fprintf(stderr, "osc_remove_module_handler\n");
-    d_debug("osc_remove_module_handler()");
+    d_debug("osc_get_module_info_handler()");
     DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
     DISTRHO_SAFE_ASSERT_RETURN(types != nullptr, 0);
     DISTRHO_SAFE_ASSERT_RETURN(types[0] == 'h', 0);
+    const int64_t moduleId = argv[0]->h;
+
     if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
     {
-        const int64_t moduleId = argv[0]->h;
         CardinalPluginContext* const context = plugin->context;
         rack::contextSet(context);
-        // Remove module widget
-        auto mw = context->scene->rack->getModule(moduleId);
-        if (mw) {
-            context->scene->rack->removeModule(mw);
-            delete mw;
-        }
-        fprintf(stderr, "   here\n");
-        /*
-        // remove module
-        auto m = context->engine->getModule(moduleId);
-        if (m) {
-            context->engine->removeModule(m);
-            delete(m);
-        }
-        */
+        rack::engine::Module* const module = context->engine->getModule(moduleId);
+        DISTRHO_SAFE_ASSERT_RETURN(module != nullptr, 0);
+        DISTRHO_SAFE_ASSERT_RETURN(module->getModel() != nullptr, 0);
+        auto model = module->getModel();
+        DISTRHO_SAFE_ASSERT_RETURN(model->plugin != nullptr, 0);
+
+        const lo_address source = lo_message_get_source(m);
+        const lo_server server = static_cast<Initializer*>(self)->oscServer;
+        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/module_info", "hssiiii",
+            moduleId,
+            model->plugin->slug.c_str(),
+            model->slug.c_str(),
+            module->getNumParams(),
+            module->getNumInputs(),
+            module->getNumOutputs(),
+            module->getNumLights()
+            );
     }
+
     return 0;
 }
 
@@ -420,6 +434,163 @@ static int osc_add_module_handler(const char*, const char* types, lo_arg** argv,
     return 0;
 }
 
+static int osc_remove_module_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_remove_module_handler()");
+    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[0] == 'h', 0);
+
+    bool ok = false;
+    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+    {
+        const int64_t moduleId = argv[0]->h;
+        CardinalPluginContext* const context = plugin->context;
+        rack::contextSet(context);
+        // Remove module widget
+        auto mw = context->scene->rack->getModule(moduleId);
+        if (mw) {
+            context->scene->rack->removeModule(mw);
+            delete mw;
+        }
+        /*
+        // remove module
+        auto m = context->engine->getModule(moduleId);
+        if (m) {
+            context->engine->removeModule(m);
+            delete(m);
+        }
+        */
+       ok = true;
+    }
+    const lo_address source = lo_message_get_source(m);
+    const lo_server server = static_cast<Initializer*>(self)->oscServer;
+    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "remove_module", ok ? "ok" : "fail");
+
+    return 0;
+}
+
+static int osc_param_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_param_handler()");
+    DISTRHO_SAFE_ASSERT_RETURN(argc == 3, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[0] == 'h', 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[1] == 'i', 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[2] == 'f', 0);
+
+    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+    {
+        CardinalPluginContext* const context = plugin->context;
+
+        const int64_t moduleId = argv[0]->h;
+        const int paramId = argv[1]->i;
+        const float paramValue = argv[2]->f;
+
+        rack::engine::Module* const module = context->engine->getModule(moduleId);
+        DISTRHO_SAFE_ASSERT_RETURN(module != nullptr, 0);
+
+        context->engine->setParamValue(module, paramId, paramValue);
+    }
+
+    return 0;
+}
+
+static int osc_get_cables_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_get_cables_handler()");
+
+    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+    {
+        CardinalPluginContext* const context = plugin->context;
+        rack::contextSet(context);
+
+        auto cableIds = context->engine->getCableIds();
+        // Send cable ids back to requester
+        const lo_address source = lo_message_get_source(m);
+        const lo_server server = static_cast<Initializer*>(self)->oscServer;
+        for (size_t id : cableIds) {
+            auto cable = context->engine->getCable(id);
+            if (cable && cable->inputModule && cable->outputModule)
+                lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/cable", "hhihi", id, cable->outputModule->id, cable->outputId, cable->inputModule->id, cable->inputId);
+        }
+    }
+
+    return 0;
+}
+
+static int osc_get_input_cables_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_get_input_cables_handler()");
+    DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[0] == 'h', 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[1] == 'i', 0);
+
+    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+    {
+        const int64_t moduleId = argv[0]->h;
+        const int inputId = argv[1]->i;
+        CardinalPluginContext* const context = plugin->context;
+        rack::contextSet(context);
+
+        rack::engine::Module* const module = context->engine->getModule(moduleId);
+        DISTRHO_SAFE_ASSERT_RETURN(module != nullptr, 0);
+        DISTRHO_SAFE_ASSERT_RETURN(module->getNumInputs() > inputId, 0);
+
+        auto allCableIds = context->engine->getCableIds();
+        std::vector<rack::engine::Cable*> cables;
+        for (size_t id : allCableIds) {
+            auto cable = context->engine->getCable(id);
+            if (cable && cable->inputModule == module && cable->inputId == inputId && cable->outputModule)
+                cables.push_back(cable);
+        }
+        // Send cable ids back to requester
+        const lo_address source = lo_message_get_source(m);
+        const lo_server server = static_cast<Initializer*>(self)->oscServer;
+        for (auto cable : cables)
+            lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/cable", "hhihi", cable->id, cable->outputModule->id, cable->outputId, cable->inputModule->id, cable->inputId);
+    }
+
+    return 0;
+}
+
+static int osc_get_output_cables_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_get_output_cables_handler()");
+    DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[0] == 'h', 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[1] == 'i', 0);
+
+    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+    {
+        const int64_t moduleId = argv[0]->h;
+        const int inputId = argv[1]->i;
+        CardinalPluginContext* const context = plugin->context;
+        rack::contextSet(context);
+
+        rack::engine::Module* const module = context->engine->getModule(moduleId);
+        DISTRHO_SAFE_ASSERT_RETURN(module != nullptr, 0);
+        DISTRHO_SAFE_ASSERT_RETURN(module->getNumOutputs() > inputId, 0);
+
+        auto allCableIds = context->engine->getCableIds();
+        std::vector<rack::engine::Cable*> cables;
+        for (size_t id : allCableIds) {
+            auto cable = context->engine->getCable(id);
+            if (cable && cable->outputModule == module && cable->outputId == inputId && cable->inputModule)
+                cables.push_back(cable);
+        }
+        // Send cable ids back to requester
+        const lo_address source = lo_message_get_source(m);
+        const lo_server server = static_cast<Initializer*>(self)->oscServer;
+        for (auto cable : cables)
+            lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/cable", "hhihi", cable->id, cable->outputModule->id, cable->outputId, cable->inputModule->id, cable->inputId);
+    }
+
+    return 0;
+}
+
 static int osc_add_cable_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
 {
     d_debug("osc_add_cable_handler()");
@@ -441,8 +612,10 @@ static int osc_add_cable_handler(const char*, const char* types, lo_arg** argv, 
 
         rack::engine::Module* const srcModule = context->engine->getModule(srcModuleId);
         DISTRHO_SAFE_ASSERT_RETURN(srcModule != nullptr, 0);
+        DISTRHO_SAFE_ASSERT_RETURN(srcModule->getNumOutputs() > srcPortId, 0);
         rack::engine::Module* const dstModule = context->engine->getModule(dstModuleId);
         DISTRHO_SAFE_ASSERT_RETURN(dstModule != nullptr, 0);
+        DISTRHO_SAFE_ASSERT_RETURN(dstModule->getNumInputs() > dstPortId, 0);
         // Create cable
         auto cable = new rack::engine::Cable;
         cable->inputModule = dstModule;
@@ -461,9 +634,9 @@ static int osc_add_cable_handler(const char*, const char* types, lo_arg** argv, 
             cw->color = context->scene->rack->getNextCableColor();
         context->scene->rack->addCable(cw);
         // Send cable id back to requester
-        const lo_address target = lo_message_get_source(m);
+        const lo_address source = lo_message_get_source(m);
         const lo_server server = static_cast<Initializer*>(self)->oscServer;
-        lo_send_from(target, server, LO_TT_IMMEDIATE, "/resp/module", "h", cable->id);
+        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/cable", "h", cable->id);
     }
 
     return 0;
@@ -472,15 +645,39 @@ static int osc_add_cable_handler(const char*, const char* types, lo_arg** argv, 
 static int osc_remove_cable_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
 {
     d_debug("osc_remove_cable_handler()");
-    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(argc > 0, 0);
     DISTRHO_SAFE_ASSERT_RETURN(types != nullptr, 0);
     DISTRHO_SAFE_ASSERT_RETURN(types[0] == 'h', 0);
 
+    bool ok = false;
+
     if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
     {
-        const int64_t cableId = argv[0]->h;
         CardinalPluginContext* const context = plugin->context;
         rack::contextSet(context);
+
+        int64_t cableId = -1;
+        if (argc == 4) {
+            DISTRHO_SAFE_ASSERT_RETURN(types[1] == 'i', 0)
+            DISTRHO_SAFE_ASSERT_RETURN(types[2] == 'h', 0)
+            DISTRHO_SAFE_ASSERT_RETURN(types[3] == 'i', 0)
+            const int64_t srcModuleId = argv[0]->h;
+            const int outputId = argv[1]->i;
+            const int64_t dstModuleId = argv[2]->h;
+            const int inputId = argv[3]->i;
+            auto cableIds = context->engine->getCableIds();
+            for (size_t id : cableIds) {
+                auto cable = context->engine->getCable(id);
+                if (!cable || !cable->inputModule || cable->inputModule->id != dstModuleId || cable->inputId != inputId || !cable->outputModule || cable->outputModule->id != srcModuleId || cable->outputId != outputId)
+                    continue;
+                cableId = cable->id;
+                break;
+            }
+            DISTRHO_SAFE_ASSERT_RETURN(cableId != -1, 0)
+        } else {
+            cableId = argv[0]->h;
+        }
+
         // Remove cable widget
         auto cw = context->scene->rack->getCable(cableId);
         if (cw) {
@@ -493,28 +690,12 @@ static int osc_remove_cable_handler(const char*, const char* types, lo_arg** arg
             context->engine->removeCable(cable);
             delete(cable);
         }
-    }
-
-    return 0;
-}
-
-static int osc_clear_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
-{
-    d_debug("osc_clear_handler()");
-    bool ok = false;
-
-    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
-    {
-        CardinalPluginContext* const context = plugin->context;
-        rack::contextSet(context);
-        context->scene->rack->clear();
-        context->engine->clear();
         ok = true;
     }
 
     const lo_address source = lo_message_get_source(m);
     const lo_server server = static_cast<Initializer*>(self)->oscServer;
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "clear", ok ? "ok" : "fail");
+    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "remove_cable", ok ? "ok" : "fail");
     return 0;
 }
 
@@ -539,6 +720,33 @@ static int osc_host_param_handler(const char*, const char* types, lo_arg** argv,
         const float paramValue = argv[1]->f;
 
         context->parameters[uparamId] = paramValue;
+    }
+
+    return 0;
+}
+
+static int osc_get_param_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_get_module_param_info_handler()");
+    DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr, 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[0] == 'h', 0);
+    DISTRHO_SAFE_ASSERT_RETURN(types[1] == 'i', 0);
+    const int64_t moduleId = argv[0]->h;
+    const int paramId = argv[1]->i;
+
+    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+    {
+        CardinalPluginContext* const context = plugin->context;
+        rack::contextSet(context);
+        rack::engine::Module* const module = context->engine->getModule(moduleId);
+        DISTRHO_SAFE_ASSERT_RETURN(module != nullptr, 0);
+        DISTRHO_SAFE_ASSERT_RETURN(module->getNumParams() > paramId, 0);
+        float value = module->getParam(paramId).getValue();
+        
+        const lo_address source = lo_message_get_source(m);
+        const lo_server server = static_cast<Initializer*>(self)->oscServer;
+        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/param", "hf", moduleId, value);
     }
 
     return 0;
@@ -876,17 +1084,24 @@ bool Initializer::startRemoteServer(const char* const port)
     oscServer = lo_server_thread_get_server(oscServerThread);
 
     lo_server_thread_add_method(oscServerThread, "/hello", "", osc_hello_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/host-param", "if", osc_host_param_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/clear", "", osc_clear_handler, this);
     lo_server_thread_add_method(oscServerThread, "/load", "b", osc_load_handler, this);
     lo_server_thread_add_method(oscServerThread, "/load", "s", osc_load_file_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/param", "hif", osc_param_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/get_modules", "", osc_get_modules_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/get_module_info", "h", osc_get_module_info_handler, this);
     lo_server_thread_add_method(oscServerThread, "/add_module", "ss", osc_add_module_handler, this);
     lo_server_thread_add_method(oscServerThread, "/add_module", "ssii", osc_add_module_handler, this);
     lo_server_thread_add_method(oscServerThread, "/remove_module", "h", osc_remove_module_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/get_cables", "", osc_get_cables_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/get_input_cables", "hi", osc_get_input_cables_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/get_output_cables", "hi", osc_get_output_cables_handler, this);
     lo_server_thread_add_method(oscServerThread, "/add_cable", "hihi", osc_add_cable_handler, this);
     lo_server_thread_add_method(oscServerThread, "/add_cable", "hihis", osc_add_cable_handler, this);
     lo_server_thread_add_method(oscServerThread, "/remove_cable", "h", osc_remove_cable_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/clear", "", osc_clear_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/remove_cable", "hihi", osc_remove_cable_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/host-param", "if", osc_host_param_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/param", "hif", osc_param_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/param", "hi", osc_get_param_handler, this);
     lo_server_thread_add_method(oscServerThread, "/screenshot", "b", osc_screenshot_handler, this);
     lo_server_thread_add_method(oscServerThread, nullptr, nullptr, osc_fallback_handler, nullptr);
     lo_server_thread_start(oscServerThread);
@@ -898,17 +1113,24 @@ bool Initializer::startRemoteServer(const char* const port)
         return false;
 
     lo_server_add_method(oscServer, "/hello", "", osc_hello_handler, this);
-    lo_server_add_method(oscServer, "/host-param", "if", osc_host_param_handler, this);
+    lo_server_add_method(oscServer, "/clear", "", osc_clear_handler, this);
     lo_server_add_method(oscServer, "/load", "b", osc_load_handler, this);
     lo_server_add_method(oscServer, "/load", "s", osc_load_file_handler, this);
-    lo_server_add_method(oscServer, "/param", "hif", osc_param_handler, this);
+    lo_server_add_method(oscServer, "/get_modules", "", osc_get_modules_handler, this);
+    lo_server_add_method(oscServer, "/get_module_info", "h", osc_get_module_info_handler, this);
     lo_server_add_method(oscServer, "/add_module", "ss", osc_add_module_handler, this);
     lo_server_add_method(oscServer, "/add_module", "ssii", osc_add_module_handler, this);
     lo_server_add_method(oscServer, "/remove_module", "h", osc_remove_module_handler, this);
+    lo_server_add_method(oscServer, "/get_cables", "", osc_get_cables_handler, this);
+    lo_server_add_method(oscServer, "/get_input_cables", "hi", osc_get_input_cables_handler, this);
+    lo_server_add_method(oscServer, "/get_output_cables", "hi", osc_get_output_cables_handler, this);
     lo_server_add_method(oscServer, "/add_cable", "hihi", osc_add_cable_handler, this);
     lo_server_add_method(oscServer, "/add_cable", "hihis", osc_add_cable_handler, this);
     lo_server_add_method(oscServer, "/remove_cable", "h", osc_remove_cable_handler, this);
-    lo_server_add_method(oscServer, "/clear", "", osc_clear_handler, this);
+    lo_server_add_method(oscServer, "/remove_cable", "hihi", osc_remove_cable_handler, this);
+    lo_server_add_method(oscServer, "/host-param", "if", osc_host_param_handler, this);
+    lo_server_add_method(oscServer, "/param", "hif", osc_param_handler, this);
+    lo_server_add_method(oscServer, "/param", "hi", osc_get_param_handler, this);
     lo_server_add_method(oscServer, nullptr, nullptr, osc_fallback_handler, nullptr);
    #endif
 
