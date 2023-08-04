@@ -45,6 +45,7 @@
 #include <window/Window.hpp>
 #include <plugin.hpp>
 #include <helpers.hpp>
+#include <tag.hpp>
 
 #ifndef DISTRHO_PLUGIN_WANT_DIRECT_ACCESS
 # error wrong build
@@ -338,6 +339,42 @@ static int osc_load_file_handler(const char*, const char* types, lo_arg** argv, 
     return 0;
 }
 
+static int osc_get_models_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_get_models_handler()");
+
+    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+    {
+        CardinalPluginContext* const context = plugin->context;
+        rack::contextSet(context);
+
+        const lo_address source = lo_message_get_source(m);
+        const lo_server server = static_cast<Initializer*>(self)->oscServer;
+
+        for (rack::plugin::Plugin* plugin : rack::plugin::plugins) {
+	        for (rack::plugin::Model* model : plugin->models) {
+                std::string tagStr;
+                for (int tagId : model->tagIds) {
+                    // Add all aliases of a tag
+                    for (const std::string& tagAlias : rack::tag::tagAliases[tagId]) {
+                        tagStr += tagAlias;
+                        tagStr += " ";
+                    }
+                }
+                lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/plugin", "sssss",
+                model->plugin->brand.c_str(),
+				model->plugin->name.c_str(),
+				model->name.c_str(),
+				model->description.c_str(),
+                tagStr.c_str()
+                );
+            }
+        }
+    }
+
+    return 0;
+}
+
 static int osc_get_modules_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
 {
     d_debug("osc_get_modules_handler()");
@@ -552,7 +589,7 @@ static int osc_add_module_handler(const char*, const char* types, lo_arg** argv,
         CardinalPluginContext* const context = plugin->context;
         rack::contextSet(context);
 
-        rack::plugin::Model* model = rack::plugin::getModel(pluginSlug, modelSlug);
+        rack::plugin::Model* model = rack::plugin::getModelFallback(pluginSlug, modelSlug);
         DISTRHO_SAFE_ASSERT_RETURN(model != nullptr, 0);
         rack::CardinalPluginModelHelper* const helper = dynamic_cast<rack::CardinalPluginModelHelper*>(model);
         DISTRHO_SAFE_ASSERT_RETURN(helper != nullptr, 0);
@@ -1234,6 +1271,7 @@ bool Initializer::startRemoteServer(const char* const port)
     lo_server_thread_add_method(oscServerThread, "/clear", "", osc_clear_handler, this);
     lo_server_thread_add_method(oscServerThread, "/load", "b", osc_load_handler, this);
     lo_server_thread_add_method(oscServerThread, "/load", "s", osc_load_file_handler, this);
+    lo_server_thread_add_method(oscServerThread, "/get_models", "", osc_get_models_handler, this);
     lo_server_thread_add_method(oscServerThread, "/get_modules", "", osc_get_modules_handler, this);
     lo_server_thread_add_method(oscServerThread, "/get_module_info", "h", osc_get_module_info_handler, this);
     lo_server_thread_add_method(oscServerThread, "/get_input_info", "hi", osc_get_input_info_handler, this);
@@ -1267,6 +1305,7 @@ bool Initializer::startRemoteServer(const char* const port)
     lo_server_add_method(oscServer, "/clear", "", osc_clear_handler, this);
     lo_server_add_method(oscServer, "/load", "b", osc_load_handler, this);
     lo_server_add_method(oscServer, "/load", "s", osc_load_file_handler, this);
+    lo_server_add_method(oscServer, "/get_models", "", osc_get_models_handler, this);
     lo_server_add_method(oscServer, "/get_modules", "", osc_get_modules_handler, this);
     lo_server_add_method(oscServer, "/get_module_info", "h", osc_get_module_info_handler, this);
     lo_server_add_method(oscServer, "/get_input_info", "hi", osc_get_input_info_handler, this);

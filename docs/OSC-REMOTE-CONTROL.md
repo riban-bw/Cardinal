@@ -51,7 +51,13 @@ Cardinal replies back indicating either success or failure, using `/resp` path w
 Sending a `/load` message with string parameter will load the patch file pointed to by the message.
 The full path and filename must be passed for a valid patch file.
 
-Cardinal replies back indicating either success or failure, using `/resp` path with `s:"load" s:"ok"|"fail"`` message.
+Cardinal replies back indicating either success or failure, using `/resp` path with `s:"load" s:"ok"|"fail"` message.
+
+#### /get_models
+
+Sending a `/get_models` message will request a list of all models available to Cardinal.
+
+Carinal replise back using `/resp/plugin` path with `s:brand s:pluginName s:modelName s:description s:tags` message. (One message for each available plugin.)
 
 #### /get_modules
 
@@ -59,25 +65,25 @@ Sending a `/get_modules` message will request a list of all modules in the rack.
 
 Cardinal replies back using `/resp/module` path with `h:moduleId` message. (One message for each installed module.)
 
-#### /get_module_info h:module_id
+#### /get_module_info h:moduleId
 
 Sending a `/get_module_info` message will request a information about a module.
 
 Cardinal replies back using `/resp/module_info` path with `h:moduleId s:pluginSlug s:modelSlug i:numParams i:numInputs i:numOutputs i:numLights` message.
 
-#### /get_input_info h:module_id i:input
+#### /get_input_info h:moduleId i:input
 
 Sending a `/get_input_info` message will request a information about a module input.
 
 Cardinal replies back using `/resp/input_info` path with `h:moduleId i:input s:name` message.
 
-#### /get_output_info h:module_id i:output
+#### /get_output_info h:moduleId i:output
 
 Sending a `/get_output_info` message will request a information about a module output.
 
 Cardinal replies back using `/resp/output_info` path with `h:moduleId i:output s:name` message.
 
-#### /get_param_info h:module_id i:param
+#### /get_param_info h:moduleId i:param
 
 Sending a `/get_param_info` message will request a information about a module param.
 
@@ -95,7 +101,7 @@ Sending a `/add_module` message with these extra parameters will add a new modul
 
 Cardinal replies back if the module is added, using `/resp/module` path with `h:moduleId` message.
 
-#### /remove_module h:module_id
+#### /remove_module h:moduleId
 
 Sending a `/remove_module` message will remove the specified module.
 
@@ -119,7 +125,7 @@ Sending a `/get_output_cables` message will request a list of cables connected t
 
 Cardinal replies back using `/resp/cable` path and `h:cable_id h:src_module_id i:output h:dst_module i:input` message (one message for each cable).
 
-#### /add_cable h:srcModuleId i:srcOutputId h:dstModuleId i:dstInputId s:color(optional)
+#### /add_cable h:srcModuleId i:outputId h:dstModuleId i:inputId s:color(optional)
 
 Sending a `/add_cable` message will add a new cable and connect it to the specified source module's output and the specified destination module's input.
 The optional `color` parameter may be supplied in the format "#rrggbb". If no color is provided then the next color is used.
