@@ -37,19 +37,26 @@ Useful when testing if the connection works.
 
 Sending a `/clear` message will remove all cables and modules.
 
-Cardinal replies back indicating either success or failure, using `/resp` path with `s:"clear" s:"ok"|"fail"`` message.
+Cardinal replies back indicating either success or failure, using `/resp` path with `s:"clear" s:"ok"|"fail"` message.
 
-#### /load b:patch-blob
+#### /get_patches
+
+Sendind ag `/get_patches` message will request a list of patch files in the home directory.
+
+Cardinal replies back using `/resp/patch` path with `s:filename` message. (One message for each vcv file.)
+
+#### /load b:patchBlob
 
 Sending a `/load` message with blob parameter will load the patch file contained in the message.  
 Patch contents must be in compressed format, not plain-text json.
 
 Cardinal replies back indicating either success or failure, using `/resp` path with `s:"load" s:"ok"|"fail"`` message.
 
-#### /load s:file-path
+#### /load s:filePath
 
-Sending a `/load` message with string parameter will load the patch file pointed to by the message.
-The full path and filename must be passed for a valid patch file.
+Sending a `/load` message with string parameter will load the patch file.
+The file must be a valid .vcv patch file within the home directory. A list of available patch files may be requested with `/get_patches` command.
+TODO: Should this use a dedicated patch directory, e.g. home/Cardinal/patches, home/Documents/Cardinal/patches, etc.?
 
 Cardinal replies back indicating either success or failure, using `/resp` path with `s:"load" s:"ok"|"fail"` message.
 

@@ -46,6 +46,7 @@
 #include <plugin.hpp>
 #include <helpers.hpp>
 #include <tag.hpp>
+#include <ghc/filesystem.hpp>
 
 #ifndef DISTRHO_PLUGIN_WANT_DIRECT_ACCESS
 # error wrong build
@@ -276,6 +277,33 @@ static int osc_clear_handler(const char*, const char* types, lo_arg** argv, int 
     return 0;
 }
 
+
+static int osc_get_patches_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+{
+    d_debug("osc_get_patches_handler()");
+
+    const lo_address source = lo_message_get_source(m);
+    const lo_server server = static_cast<Initializer*>(self)->oscServer;
+
+    std::string dir;
+    dir = rack::homeDir();
+
+    using namespace ghc::filesystem;
+    directory_iterator it;
+    it = directory_iterator(u8path(dir.c_str()));
+    for (directory_iterator itb = begin(it), ite=end(it); itb != ite; ++itb) {
+        if (!itb->is_regular_file())
+            continue;
+        auto filepath = itb->path();
+        auto extension = filepath.extension();
+        auto filename = filepath.filename();
+        if (extension.compare(".vcv") == 0)
+            lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/patch", "s", filename.generic_u8string().c_str());
+    }
+    
+    return 0;
+}
+
 static int osc_load_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
 {
     d_debug("osc_load_handler()");
@@ -322,13 +350,19 @@ static int osc_load_file_handler(const char*, const char* types, lo_arg** argv, 
     DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
     DISTRHO_SAFE_ASSERT_RETURN(types != nullptr && types[0] == 's', 0);
 
+    std::string filename((char*)(argv[0]));
+    std::string path = rack::homeDir() + "/" + filename;
+
+    // Validate file
+    DISTRHO_SAFE_ASSERT_RETURN(rack::system::getExtension(path) == ".vcv", 0);
+    DISTRHO_SAFE_ASSERT_RETURN(rack::system::isFile(path), 0);
+
     bool ok = false;
     if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
     {
         CardinalPluginContext* const context = plugin->context;
         rack::contextSet(context);
-        std::string s((char*)(argv[0]));
-        context->patch->load(s);
+        context->patch->load(path);
         ok = true;
     }
 
@@ -1283,6 +1317,7 @@ bool Initializer::startRemoteServer(const char* const port)
 
     lo_server_add_method(oscServer, "/hello", "", osc_hello_handler, this);
     lo_server_add_method(oscServer, "/clear", "", osc_clear_handler, this);
+    lo_server_add_method(oscServer, "/get_patches", "", osc_get_patches_handler, this);
     lo_server_add_method(oscServer, "/load", "b", osc_load_handler, this);
     lo_server_add_method(oscServer, "/load", "s", osc_load_file_handler, this);
     lo_server_add_method(oscServer, "/get_models", "", osc_get_models_handler, this);
