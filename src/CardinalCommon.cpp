@@ -353,6 +353,8 @@ static int osc_get_models_handler(const char*, const char* types, lo_arg** argv,
 
         for (rack::plugin::Plugin* plugin : rack::plugin::plugins) {
 	        for (rack::plugin::Model* model : plugin->models) {
+                if (model->hidden)
+                    continue;
                 std::string tagStr;
                 for (int tagId : model->tagIds) {
                     // Add all aliases of a tag
@@ -361,13 +363,16 @@ static int osc_get_models_handler(const char*, const char* types, lo_arg** argv,
                         tagStr += " ";
                     }
                 }
-                lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/plugin", "sssss",
+                lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp/model", "ssssss",
                 model->plugin->brand.c_str(),
 				model->plugin->name.c_str(),
 				model->name.c_str(),
 				model->description.c_str(),
+                model->getManualUrl().c_str(),
                 tagStr.c_str()
                 );
+                //fprintf(stderr, "Sent OSC for %s %s %s to %s\n", model->plugin->brand.c_str(), model->plugin->name.c_str(), model->name.c_str(), lo_address_get_url(source));
+                usleep(200); // Delay to reduce risk of lost messages
             }
         }
     }
@@ -1267,32 +1272,6 @@ bool Initializer::startRemoteServer(const char* const port)
 
     oscServer = lo_server_thread_get_server(oscServerThread);
 
-    lo_server_thread_add_method(oscServerThread, "/hello", "", osc_hello_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/clear", "", osc_clear_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/load", "b", osc_load_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/load", "s", osc_load_file_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_models", "", osc_get_models_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_modules", "", osc_get_modules_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_module_info", "h", osc_get_module_info_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_input_info", "hi", osc_get_input_info_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_output_info", "hi", osc_get_output_info_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_param_info", "hi", osc_get_param_info_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_light_info", "hi", osc_get_light_info_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/add_module", "ss", osc_add_module_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/add_module", "ssii", osc_add_module_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/remove_module", "h", osc_remove_module_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_cables", "", osc_get_cables_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_input_cables", "hi", osc_get_input_cables_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/get_output_cables", "hi", osc_get_output_cables_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/add_cable", "hihi", osc_add_cable_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/add_cable", "hihis", osc_add_cable_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/remove_cable", "h", osc_remove_cable_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/remove_cable", "hihi", osc_remove_cable_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/host-param", "if", osc_host_param_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/param", "hif", osc_param_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/param", "hi", osc_get_param_handler, this);
-    lo_server_thread_add_method(oscServerThread, "/screenshot", "b", osc_screenshot_handler, this);
-    lo_server_thread_add_method(oscServerThread, nullptr, nullptr, osc_fallback_handler, nullptr);
     lo_server_thread_start(oscServerThread);
    #else
     if (oscServer != nullptr)
@@ -1300,6 +1279,7 @@ bool Initializer::startRemoteServer(const char* const port)
 
     if ((oscServer = lo_server_new_with_proto(port, LO_UDP, osc_error_handler)) == nullptr)
         return false;
+    #endif
 
     lo_server_add_method(oscServer, "/hello", "", osc_hello_handler, this);
     lo_server_add_method(oscServer, "/clear", "", osc_clear_handler, this);
@@ -1325,8 +1305,8 @@ bool Initializer::startRemoteServer(const char* const port)
     lo_server_add_method(oscServer, "/host-param", "if", osc_host_param_handler, this);
     lo_server_add_method(oscServer, "/param", "hif", osc_param_handler, this);
     lo_server_add_method(oscServer, "/param", "hi", osc_get_param_handler, this);
+    lo_server_add_method(oscServer, "/screenshot", "b", osc_screenshot_handler, this);
     lo_server_add_method(oscServer, nullptr, nullptr, osc_fallback_handler, nullptr);
-   #endif
 
     return true;
 }
