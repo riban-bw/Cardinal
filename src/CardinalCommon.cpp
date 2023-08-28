@@ -618,6 +618,7 @@ static int osc_add_module_handler(const char*, const char* types, lo_arg** argv,
     DISTRHO_SAFE_ASSERT_RETURN(types[1] == 's', 0);
     const std::string pluginSlug((char*)(argv[0]));
     const std::string modelSlug((char*)(argv[1]));
+    fprintf(stderr, "osc_add_module_handler '%s' '%s'\n", pluginSlug.c_str(), modelSlug.c_str());
     if (argc == 4) {
         DISTRHO_SAFE_ASSERT_RETURN(types[2] == 'f', 0);
         DISTRHO_SAFE_ASSERT_RETURN(types[3] == 'f', 0);
@@ -1307,6 +1308,7 @@ bool Initializer::startRemoteServer(const char* const port)
     oscServer = lo_server_thread_get_server(oscServerThread);
 
     lo_server_thread_start(oscServerThread);
+    lo_server_add_method(oscServer, "/screenshot", "b", osc_screenshot_handler, this);
    #else
     if (oscServer != nullptr)
         return true;
@@ -1340,7 +1342,6 @@ bool Initializer::startRemoteServer(const char* const port)
     lo_server_add_method(oscServer, "/host-param", "if", osc_host_param_handler, this);
     lo_server_add_method(oscServer, "/param", "hif", osc_param_handler, this);
     lo_server_add_method(oscServer, "/param", "hi", osc_get_param_handler, this);
-    lo_server_add_method(oscServer, "/screenshot", "b", osc_screenshot_handler, this);
     lo_server_add_method(oscServer, nullptr, nullptr, osc_fallback_handler, nullptr);
 
     return true;
