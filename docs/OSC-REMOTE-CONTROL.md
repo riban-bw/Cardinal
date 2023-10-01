@@ -94,7 +94,7 @@ Cardinal replies back using `/resp/output_info` path with `h:moduleId i:output s
 
 Sending a `/get_param_info` message will request a information about a module param.
 
-Cardinal replies back using `/resp/param_info` path with `h:moduleId i:paramId s:name s:unit f:value f:minValue, f:maxValue f:defaultValue f:displayValue s:DisplayValueString i:displayPrecision s:description` message.
+Cardinal replies back using `/resp/param_info` path with `h:moduleId i:paramId s:name s:unit f:value f:minValue f:maxValue f:defaultValue f:displayValue s:DisplayValueString i:displayPrecision s:description` message.
 
 #### /add_module s:plugin s:model
 
